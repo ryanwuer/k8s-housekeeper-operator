@@ -12,15 +12,12 @@ spec:
     listKind: ServiceMonitorList
     plural: servicemonitors
     singular: servicemonitor
-  scope: Namespaced
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.count
       name: Count
       type: integer
-    - jsonPath: .status.lastCheckTime
-      name: LastCheck
-      type: date
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -49,17 +46,10 @@ spec:
           spec:
             description: ServiceMonitorSpec defines the desired state of ServiceMonitor
             properties:
-              checkInterval:
-                description: CheckInterval is the interval between service checks
-                  in seconds
-                format: int32
-                minimum: 1
-                type: integer
               targetDomain:
                 description: TargetDomain is the ExternalName to monitor in services
                 type: string
             required:
-            - checkInterval
             - targetDomain
             type: object
           status:
@@ -143,10 +133,6 @@ spec:
                 description: Count is the number of services with matching ExternalName
                 format: int32
                 type: integer
-              lastCheckTime:
-                description: LastCheckTime is the last time the services were checked
-                format: date-time
-                type: string
             required:
             - count
             type: object

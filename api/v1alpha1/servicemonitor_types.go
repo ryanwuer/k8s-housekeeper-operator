@@ -28,11 +28,6 @@ type ServiceMonitorSpec struct {
 	// TargetDomain is the ExternalName to monitor in services
 	// +kubebuilder:validation:Required
 	TargetDomain string `json:"targetDomain"`
-
-	// CheckInterval is the interval between service checks in seconds
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Minimum=1
-	CheckInterval int32 `json:"checkInterval"`
 }
 
 // ServiceMonitorStatus defines the observed state of ServiceMonitor
@@ -53,6 +48,7 @@ type ServiceMonitorStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:scope=Cluster
 //+kubebuilder:printcolumn:name="Count",type="integer",JSONPath=".status.count"
 //+kubebuilder:printcolumn:name="LastCheck",type="date",JSONPath=".status.lastCheckTime"
 //+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"

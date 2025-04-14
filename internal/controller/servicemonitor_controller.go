@@ -28,10 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	monitoringv1alpha1 "github.com/ryanwuer/k8s-housekeeper-operator/api/v1alpha1"
 )
@@ -95,19 +98,11 @@ func (r *ServiceMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	// Check if it's time for the next check
-	if serviceMonitor.Status.LastCheckTime != nil {
-		nextCheck := serviceMonitor.Status.LastCheckTime.Add(time.Duration(serviceMonitor.Spec.CheckInterval) * time.Second)
-		if time.Now().Before(nextCheck) {
-			return ctrl.Result{RequeueAfter: time.Until(nextCheck)}, nil
-		}
-	}
-
 	// List all services
 	serviceList := &corev1.ServiceList{}
 	if err := r.List(ctx, serviceList); err != nil {
 		log.Error(err, "Failed to list services")
-		return ctrl.Result{RequeueAfter: time.Second * 10}, err
+		return ctrl.Result{}, err
 	}
 
 	// Count services with matching ExternalName
@@ -120,7 +115,6 @@ func (r *ServiceMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Update status
 	now := metav1.Now()
-	serviceMonitor.Status.LastCheckTime = &now
 	serviceMonitor.Status.Count = count
 
 	// Update conditions
@@ -129,16 +123,15 @@ func (r *ServiceMonitorReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Status:             metav1.ConditionTrue,
 		LastTransitionTime: now,
 		Reason:             "Monitoring",
-		Message:            fmt.Sprintf("Found %d services with matching ExternalName", count),
+		Message:            fmt.Sprintf("Found %d services with matching ExternalName at %s", count, now.Format(time.RFC3339)),
 	})
 
 	if err := r.Status().Update(ctx, serviceMonitor); err != nil {
 		log.Error(err, "Failed to update ServiceMonitor status")
-		return ctrl.Result{RequeueAfter: time.Second * 10}, err
+		return ctrl.Result{}, err
 	}
 
-	// Schedule next check
-	return ctrl.Result{RequeueAfter: time.Duration(serviceMonitor.Spec.CheckInterval) * time.Second}, nil
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -147,7 +140,39 @@ func (r *ServiceMonitorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&monitoringv1alpha1.ServiceMonitor{}).
 		Watches(
 			&corev1.Service{},
-			&handler.EnqueueRequestForObject{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				service := obj.(*corev1.Service)
+				// Only process ExternalName services
+				if service.Spec.Type != corev1.ServiceTypeExternalName {
+					return []reconcile.Request{}
+				}
+
+				// Get all ServiceMonitors
+				serviceMonitors := &monitoringv1alpha1.ServiceMonitorList{}
+				if err := r.List(ctx, serviceMonitors); err != nil {
+					log.FromContext(ctx).Error(err, "Failed to list ServiceMonitors")
+					return []reconcile.Request{}
+				}
+
+				// Only enqueue ServiceMonitors that match this Service's ExternalName
+				var requests []reconcile.Request
+				for _, sm := range serviceMonitors.Items {
+					if sm.Spec.TargetDomain == service.Spec.ExternalName {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: client.ObjectKey{
+								Name:      sm.Name,
+								Namespace: sm.Namespace,
+							},
+						})
+					}
+				}
+				return requests
+			}),
+			builder.WithPredicates(predicate.Or(
+				predicate.GenerationChangedPredicate{},
+				predicate.LabelChangedPredicate{},
+				predicate.AnnotationChangedPredicate{},
+			)),
 		).
 		Complete(r)
 }
