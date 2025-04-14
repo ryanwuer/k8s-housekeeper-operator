@@ -1,0 +1,9 @@
+apiVersion: monitoring.cluster.local/v1alpha1
+kind: ServiceMonitor
+metadata:
+  name: kourier-monitor
+  namespace: default
+spec:
+  targetDomain: kourier-internal.kourier-system.svc.cluster.local
+  checkInterval: 60  # Check every 60 seconds
+  # TODO(user): Add fields here

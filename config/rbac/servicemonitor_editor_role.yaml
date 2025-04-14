@@ -1,0 +1,27 @@
+# permissions for end users to edit servicemonitors.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: cursor-demo
+    app.kubernetes.io/managed-by: kustomize
+  name: servicemonitor-editor-role
+rules:
+- apiGroups:
+  - monitoring.cluster.local
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.cluster.local
+  resources:
+  - servicemonitors/status
+  verbs:
+  - get
