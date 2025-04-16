@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: cursor-demo-system
+namespace: k8s-housekeeper-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: cursor-demo-
+namePrefix: k8s-housekeeper-
 
 # Labels to add to all resources and selectors.
 #labels:
